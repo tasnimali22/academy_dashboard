@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/core/services/student_accounts_service.dart';
 import 'package:codingacademy_admin/feature/screens/students/data/cubit/students_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,11 +10,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 class StudentsCubit extends Cubit<StudentsState> {
   StudentsCubit() : super(const StudentsState()) {
+    _loadCurrentRole();
     _subscriptions
       ..add(
         StudentAccountsService.watchAdmins().listen(
           (snapshot) {
             _adminIds = snapshot.docs.map((document) => document.id).toSet();
+            _adminRoles = {
+              for (final document in snapshot.docs)
+                document.id: document.data()['role'] as String? ?? 'admin',
+            };
+            _superAdminIds = _adminRoles.entries
+                .where((entry) => entry.value == 'superAdmin')
+                .map((entry) => entry.key)
+                .toSet();
+            _includeBootstrapSuperAdmin();
             _adminsLoaded = true;
             _emitData();
           },
@@ -61,6 +72,9 @@ class StudentsCubit extends Cubit<StudentsState> {
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _courses = [];
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _exams = [];
   Set<String> _adminIds = {};
+  Map<String, String> _adminRoles = {};
+  Set<String> _superAdminIds = {};
+  bool _isSuperAdmin = false;
   bool _adminsLoaded = false;
   bool _studentsLoaded = false;
   bool _coursesLoaded = false;
@@ -74,6 +88,9 @@ class StudentsCubit extends Cubit<StudentsState> {
         courses: _courses,
         exams: _exams,
         adminIds: _adminIds,
+        adminRoles: _adminRoles,
+        superAdminIds: _superAdminIds,
+        isSuperAdmin: _isSuperAdmin,
         loading:
             !(_adminsLoaded &&
                 _studentsLoaded &&
@@ -82,6 +99,28 @@ class StudentsCubit extends Cubit<StudentsState> {
         clearError: true,
       ),
     );
+  }
+
+  Future<void> _loadCurrentRole() async {
+    try {
+      _isSuperAdmin =
+          await AdminAccessService.currentRole() == DashboardRole.superAdmin;
+      _includeBootstrapSuperAdmin();
+      _emitData();
+    } catch (error) {
+      _emitStreamError('تعذر التحقق من صلاحيات الحساب', error);
+    }
+  }
+
+  void _includeBootstrapSuperAdmin() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (!_isSuperAdmin ||
+        user?.email?.toLowerCase() != AdminAccessService.superAdminEmail) {
+      return;
+    }
+    _adminIds.add(user!.uid);
+    _adminRoles[user.uid] = 'superAdmin';
+    _superAdminIds.add(user.uid);
   }
 
   void _emitStreamError(String label, Object error) {
@@ -95,13 +134,21 @@ class StudentsCubit extends Cubit<StudentsState> {
     try {
       final result = await StudentAccountsService.refresh();
       _adminIds = result.adminIds;
+      _adminRoles = result.adminRoles;
+      _superAdminIds = _adminRoles.entries
+          .where((entry) => entry.value == 'superAdmin')
+          .map((entry) => entry.key)
+          .toSet();
       _students = result.students;
+      _includeBootstrapSuperAdmin();
       _adminsLoaded = true;
       _studentsLoaded = true;
       emit(
         state.copyWith(
           students: _students,
           adminIds: _adminIds,
+          adminRoles: _adminRoles,
+          superAdminIds: _superAdminIds,
           loading: !(_coursesLoaded && _examsLoaded),
           refreshing: false,
           notification: 'تم تحديث قائمة الطلاب: ${result.studentCount} طالب',
@@ -169,7 +216,7 @@ class StudentsCubit extends Cubit<StudentsState> {
     }
   }
 
-  Future<void> setAdminRole(String userId, {required bool isAdmin}) async {
+  Future<void> setAdminRole(String userId, {required String? role}) async {
     if (state.accountActionIds.contains(userId)) return;
     emit(
       state.copyWith(
@@ -179,17 +226,35 @@ class StudentsCubit extends Cubit<StudentsState> {
       ),
     );
     try {
-      await StudentAccountsService.setAdminRole(
-        studentId: userId,
-        isAdmin: isAdmin,
-      );
+      await StudentAccountsService.setAdminRole(studentId: userId, role: role);
       final accountActionIds = {...state.accountActionIds}..remove(userId);
+      final adminIds = {...state.adminIds};
+      final adminRoles = {...state.adminRoles};
+      final superAdminIds = {...state.superAdminIds};
+      if (role == null) {
+        adminIds.remove(userId);
+        adminRoles.remove(userId);
+        superAdminIds.remove(userId);
+      } else {
+        adminIds.add(userId);
+        adminRoles[userId] = role;
+        if (role == 'superAdmin') {
+          superAdminIds.add(userId);
+        } else {
+          superAdminIds.remove(userId);
+        }
+      }
       emit(
         state.copyWith(
+          adminIds: adminIds,
+          adminRoles: adminRoles,
+          superAdminIds: superAdminIds,
           accountActionIds: accountActionIds,
-          notification: isAdmin
-              ? 'تم تعيين الحساب كأدمن'
-              : 'تمت إزالة صلاحية الأدمن',
+          notification: switch (role) {
+            'superAdmin' => 'تم تعيين الحساب Super Admin',
+            'admin' => 'تم تعيين الحساب Admin',
+            _ => 'تمت إزالة صلاحية الأدمن',
+          },
         ),
       );
     } on FirebaseFunctionsException catch (error) {
@@ -224,6 +289,8 @@ class StudentsCubit extends Cubit<StudentsState> {
       await StudentAccountsService.deleteAccount(userId);
       final accountActionIds = {...state.accountActionIds}..remove(userId);
       final adminIds = {...state.adminIds}..remove(userId);
+      final adminRoles = {...state.adminRoles}..remove(userId);
+      final superAdminIds = {...state.superAdminIds}..remove(userId);
       final students = state.students
           .where((student) => student.id != userId)
           .toList();
@@ -231,6 +298,8 @@ class StudentsCubit extends Cubit<StudentsState> {
         state.copyWith(
           students: students,
           adminIds: adminIds,
+          adminRoles: adminRoles,
+          superAdminIds: superAdminIds,
           accountActionIds: accountActionIds,
           notification: 'تم حذف الحساب نهائيًا',
         ),

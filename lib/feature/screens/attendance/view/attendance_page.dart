@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/core/services/student_accounts_service.dart';
 import 'package:flutter/material.dart';
 
@@ -13,6 +14,7 @@ class _AttendancePageState extends State<AttendancePage> {
   DateTime _date = DateUtils.dateOnly(DateTime.now());
   String? _courseId;
   String? _loadedDocumentId;
+  String? _recordOwner;
   Map<String, bool> _marks = {};
   bool _loadingMarks = false;
   bool _saving = false;
@@ -71,6 +73,7 @@ class _AttendancePageState extends State<AttendancePage> {
     setState(() {
       _loadingMarks = true;
       _loadedDocumentId = documentId;
+      _recordOwner = null;
     });
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -80,6 +83,7 @@ class _AttendancePageState extends State<AttendancePage> {
       if (!mounted || _loadedDocumentId != documentId) return;
       final rawMarks = snapshot.data()?['records'];
       setState(() {
+        _recordOwner = snapshot.data()?['createdBy'] as String?;
         _marks = rawMarks is Map
             ? rawMarks.map(
                 (key, value) => MapEntry(key.toString(), value == true),
@@ -130,6 +134,7 @@ class _AttendancePageState extends State<AttendancePage> {
       final id = _documentId(courseId, _date);
       await FirebaseFirestore.instance.collection('attendance').doc(id).set({
         'courseId': courseId,
+        'createdBy': _recordOwner ?? await AdminAccessService.requireUserId(),
         'date': Timestamp.fromDate(_date),
         'records': {
           for (final student in students) student.id: _marks[student.id],
@@ -170,10 +175,7 @@ class _AttendancePageState extends State<AttendancePage> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('courses')
-            .orderBy('order')
-            .snapshots(),
+        stream: AdminAccessService.watchContent('courses'),
         builder: (context, coursesSnapshot) {
           if (coursesSnapshot.hasError) {
             return const Center(child: Text('تعذر تحميل الكورسات'));
@@ -181,7 +183,14 @@ class _AttendancePageState extends State<AttendancePage> {
           if (!coursesSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final courses = coursesSnapshot.data!.docs;
+          final courses = coursesSnapshot.data!.docs.toList()
+            ..sort((first, second) {
+              final firstOrder = first.data()['order'];
+              final secondOrder = second.data()['order'];
+              final firstValue = firstOrder is num ? firstOrder : 0;
+              final secondValue = secondOrder is num ? secondOrder : 0;
+              return firstValue.compareTo(secondValue);
+            });
           if (courses.isEmpty) {
             return const Center(child: Text('أضيفي كورسًا قبل تسجيل الحضور'));
           }
@@ -250,8 +259,19 @@ class _AttendancePageState extends State<AttendancePage> {
                     }
                     final students = studentsSnapshot.data!.docs.where((user) {
                       if (_adminIds.contains(user.id)) return false;
-                      final ids = (user.data()['courseIds'] as List?) ?? [];
-                      return ids.contains(selectedCourse);
+                      final data = user.data();
+                      final ids = (data['courseIds'] as List?) ?? [];
+                      if (ids.contains(selectedCourse)) return true;
+                      final ownerId =
+                          courses
+                              .firstWhere((course) => course.id == selectedCourse)
+                              .data()['createdBy'] as String? ??
+                          '';
+                      final grants = data['adminCourseGrants'];
+                      final ownerGrants = grants is Map
+                          ? (grants[ownerId] as List? ?? const [])
+                          : const [];
+                      return ownerGrants.contains(selectedCourse);
                     }).toList();
                     if (students.isEmpty) {
                       return const Center(

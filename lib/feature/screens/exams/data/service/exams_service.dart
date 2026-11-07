@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/feature/screens/exams/data/model/exam_question_draft.dart';
 
 class ExamAnswerMigrationResult {
@@ -18,10 +19,10 @@ class ExamsService {
   final FirebaseFirestore _firestore;
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchExams() =>
-      _firestore.collection('exams').orderBy('order').snapshots();
+      AdminAccessService.watchContent('exams');
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchCourses() =>
-      _firestore.collection('courses').orderBy('order').snapshots();
+      AdminAccessService.watchContent('courses');
 
   Future<void> createExam({
     required String title,
@@ -30,13 +31,14 @@ class ExamsService {
     required DateTime date,
     required List<ExamQuestionDraft> questions,
   }) async {
-    final exams = await _firestore.collection('exams').get();
+    final exams = await AdminAccessService.loadContent('exams');
     final maxOrder = exams.docs.fold<int>(0, (currentMax, exam) {
       final order = exam.data()['order'];
       return order is int && order > currentMax ? order : currentMax;
     });
 
     final examReference = _firestore.collection('exams').doc();
+    final createdBy = await AdminAccessService.requireUserId();
     final batch = _firestore.batch()
       ..set(examReference, {
         'title': title.trim(),
@@ -46,6 +48,7 @@ class ExamsService {
         'date': Timestamp.fromDate(date),
         'icon': 'code',
         'order': maxOrder + 1,
+        'createdBy': createdBy,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -80,7 +83,7 @@ class ExamsService {
   }
 
   Future<ExamAnswerMigrationResult> migrateLegacyAnswers() async {
-    final exams = await _firestore.collection('exams').get();
+    final exams = await AdminAccessService.loadContent('exams');
     var migratedQuestions = 0;
     final unresolvedQuestions = <String>[];
 

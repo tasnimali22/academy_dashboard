@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:codingacademy_admin/firebase_options.dart';
@@ -7,11 +8,13 @@ import 'package:codingacademy_admin/firebase_options.dart';
 class StudentAccountsRefreshResult {
   const StudentAccountsRefreshResult({
     required this.adminIds,
+    required this.adminRoles,
     required this.students,
     required this.studentCount,
   });
 
   final Set<String> adminIds;
+  final Map<String, String> adminRoles;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> students;
   final int studentCount;
 }
@@ -27,10 +30,10 @@ class StudentAccountsService {
       _firestore.collection('users').snapshots();
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchCourses() =>
-      _firestore.collection('courses').orderBy('order').snapshots();
+      AdminAccessService.watchContent('courses');
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchExams() =>
-      _firestore.collection('exams').orderBy('order').snapshots();
+      AdminAccessService.watchContent('exams');
 
   static Future<Set<String>> loadAdminIds() async {
     final snapshot = await _firestore.collection('admins').get();
@@ -48,12 +51,17 @@ class StudentAccountsService {
     ]);
 
     final adminIds = snapshots[0].docs.map((document) => document.id).toSet();
+    final adminRoles = {
+      for (final document in snapshots[0].docs)
+        document.id: document.data()['role'] as String? ?? 'admin',
+    };
     final studentCount = snapshots[1].docs
         .where((document) => !adminIds.contains(document.id))
         .length;
 
     return StudentAccountsRefreshResult(
       adminIds: adminIds,
+      adminRoles: adminRoles,
       students: snapshots[1].docs,
       studentCount: studentCount,
     );
@@ -76,6 +84,9 @@ class StudentAccountsService {
     required String email,
     required String password,
   }) async {
+    if (!await AdminAccessService.isSuperAdmin()) {
+      throw StateError('إنشاء حسابات الطلاب متاح لـ Super Admin فقط.');
+    }
     final normalizedName = name.trim();
     final normalizedEmail = email.trim();
     if (normalizedName.isEmpty ||
@@ -127,51 +138,42 @@ class StudentAccountsService {
 
   static Future<void> setAdminRole({
     required String studentId,
-    required bool isAdmin,
+    required String? role,
   }) async {
+    if (!await AdminAccessService.isSuperAdmin()) {
+      throw StateError('إدارة صلاحيات الأدمن متاحة لـ Super Admin فقط.');
+    }
+    if (role != null && role != 'admin' && role != 'superAdmin') {
+      throw ArgumentError.value(role, 'role', 'دور غير صالح');
+    }
     final callerUid = FirebaseAuth.instance.currentUser?.uid;
     if (callerUid == null) {
       throw StateError('انتهت جلسة الدخول. سجلي الدخول مجددًا.');
     }
-    if (!isAdmin && callerUid == studentId) {
+    if (role == null && callerUid == studentId) {
       throw StateError('لا يمكنك إزالة صلاحية الأدمن من حسابك الحالي.');
     }
 
     final adminRef = _firestore.collection('admins').doc(studentId);
-    final knownAdmins = isAdmin
-        ? const <String>[]
-        : (await _firestore.collection('admins').get()).docs
-              .map((document) => document.id)
-              .toList();
     await _firestore.runTransaction((transaction) async {
       final targetAdmin = await transaction.get(adminRef);
-      if (isAdmin) {
+      if (role != null) {
         final student = await transaction.get(
           _firestore.collection('users').doc(studentId),
         );
         if (!student.exists) {
           throw StateError('لا يوجد ملف طالب لهذا الحساب.');
         }
-        if (!targetAdmin.exists) {
-          transaction.set(adminRef, {
-            'promotedBy': callerUid,
-            'promotedAt': FieldValue.serverTimestamp(),
-          });
-        }
+        transaction.set(adminRef, {
+          'role': role,
+          'updatedBy': callerUid,
+          'updatedAt': FieldValue.serverTimestamp(),
+          if (!targetAdmin.exists) 'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
         return;
       }
 
       if (!targetAdmin.exists) return;
-      var remainingAdmins = 0;
-      for (final adminId in knownAdmins) {
-        final admin = await transaction.get(
-          _firestore.collection('admins').doc(adminId),
-        );
-        if (admin.exists) remainingAdmins++;
-      }
-      if (remainingAdmins <= 1) {
-        throw StateError('يجب أن يبقى حساب أدمن واحد على الأقل.');
-      }
       transaction.delete(adminRef);
     });
   }

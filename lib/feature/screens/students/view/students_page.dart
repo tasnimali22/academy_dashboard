@@ -27,19 +27,20 @@ class StudentsPage extends StatelessWidget {
             appBar: AppBar(
               title: const Text('الطلاب والصلاحيات'),
               actions: [
-                IconButton(
-                  tooltip: 'إضافة حساب طالب',
-                  onPressed: state.creatingAccount
-                      ? null
-                      : () => StudentsBody.showCreateStudentDialog(context),
-                  icon: state.creatingAccount
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.person_add_alt_1),
-                ),
+                if (state.isSuperAdmin)
+                  IconButton(
+                    tooltip: 'إضافة حساب طالب',
+                    onPressed: state.creatingAccount
+                        ? null
+                        : () => StudentsBody.showCreateStudentDialog(context),
+                    icon: state.creatingAccount
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.person_add_alt_1),
+                  ),
                 IconButton(
                   tooltip: 'تحديث قائمة الطلاب',
                   onPressed: state.refreshing

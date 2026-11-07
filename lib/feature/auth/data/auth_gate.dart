@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/feature/auth/view/login_page.dart';
 import 'package:codingacademy_admin/feature/auth/view/widget/loading.dart';
 import 'package:codingacademy_admin/feature/auth/view/widget/no_access.dart';
@@ -19,6 +20,9 @@ class AuthGate extends StatelessWidget {
         }
         final user = snap.data;
         if (user == null) return const LoginPage();
+        if (user.email?.toLowerCase() == AdminAccessService.superAdminEmail) {
+          return const HomePage();
+        }
 
         return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           future: FirebaseFirestore.instance

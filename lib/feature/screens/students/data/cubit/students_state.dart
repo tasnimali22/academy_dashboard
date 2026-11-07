@@ -7,6 +7,9 @@ class StudentsState extends Equatable {
     this.courses = const [],
     this.exams = const [],
     this.adminIds = const {},
+    this.adminRoles = const {},
+    this.superAdminIds = const {},
+    this.isSuperAdmin = false,
     this.loading = true,
     this.refreshing = false,
     this.accountActionIds = const {},
@@ -19,6 +22,9 @@ class StudentsState extends Equatable {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> courses;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> exams;
   final Set<String> adminIds;
+  final Map<String, String> adminRoles;
+  final Set<String> superAdminIds;
+  final bool isSuperAdmin;
   final bool loading;
   final bool refreshing;
   final Set<String> accountActionIds;
@@ -31,6 +37,9 @@ class StudentsState extends Equatable {
     List<QueryDocumentSnapshot<Map<String, dynamic>>>? courses,
     List<QueryDocumentSnapshot<Map<String, dynamic>>>? exams,
     Set<String>? adminIds,
+    Map<String, String>? adminRoles,
+    Set<String>? superAdminIds,
+    bool? isSuperAdmin,
     bool? loading,
     bool? refreshing,
     Set<String>? accountActionIds,
@@ -45,6 +54,9 @@ class StudentsState extends Equatable {
       courses: courses ?? this.courses,
       exams: exams ?? this.exams,
       adminIds: adminIds ?? this.adminIds,
+      adminRoles: adminRoles ?? this.adminRoles,
+      superAdminIds: superAdminIds ?? this.superAdminIds,
+      isSuperAdmin: isSuperAdmin ?? this.isSuperAdmin,
       loading: loading ?? this.loading,
       refreshing: refreshing ?? this.refreshing,
       accountActionIds: accountActionIds ?? this.accountActionIds,
@@ -62,6 +74,9 @@ class StudentsState extends Equatable {
     courses,
     exams,
     adminIds,
+    adminRoles,
+    superAdminIds,
+    isSuperAdmin,
     loading,
     refreshing,
     accountActionIds,

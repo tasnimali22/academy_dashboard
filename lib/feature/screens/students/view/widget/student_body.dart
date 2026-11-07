@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/feature/screens/students/data/cubit/students_cubit.dart';
 import 'package:codingacademy_admin/feature/screens/students/data/cubit/students_state.dart';
 import 'package:codingacademy_admin/feature/screens/students/view/students_page.dart';
 import 'package:codingacademy_admin/feature/screens/students/view/widget/create_student_account_dialog.dart';
 import 'package:codingacademy_admin/feature/screens/students/view/widget/student_permissions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -14,6 +16,11 @@ class StudentsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!state.isSuperAdmin) {
+      return const Center(
+        child: Text('إدارة الحسابات متاحة لـ Super Admin فقط'),
+      );
+    }
     if (state.loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -82,7 +89,11 @@ class StudentsBody extends StatelessWidget {
                   child: Icon(Icons.admin_panel_settings_outlined),
                 ),
                 title: Text(adminId),
-                subtitle: const Text('أدمن'),
+                subtitle: Text(
+                  state.superAdminIds.contains(adminId)
+                      ? 'Super Admin'
+                      : 'Admin',
+                ),
                 trailing: state.accountActionIds.contains(adminId)
                     ? const SizedBox(
                         width: 20,
@@ -93,15 +104,18 @@ class StudentsBody extends StatelessWidget {
                         tooltip: 'إدارة الحساب',
                         onSelected: (action) =>
                             _handleAccountAction(context, adminId, action),
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'demote',
-                            child: Text('إزالة صلاحية الأدمن'),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Text('حذف الحساب'),
-                          ),
+                        itemBuilder: (_) => [
+                          if (!state.superAdminIds.contains(adminId) &&
+                              adminId != FirebaseAuth.instance.currentUser?.uid)
+                            const PopupMenuItem(
+                              value: 'remove_admin',
+                              child: Text('إزالة صلاحية الأدمن'),
+                            ),
+                          if (adminId != FirebaseAuth.instance.currentUser?.uid)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('حذف الحساب'),
+                            ),
                         ],
                       ),
               ),
@@ -139,9 +153,15 @@ class StudentsBody extends StatelessWidget {
             Flexible(child: Text(studentName(student.id, name, email))),
             if (isAdmin) ...[
               const SizedBox(width: 8),
-              const Chip(
-                avatar: Icon(Icons.verified_user_outlined, size: 16),
-                label: Text('أدمن'),
+              Chip(
+                avatar: const Icon(Icons.verified_user_outlined, size: 16),
+                label: Text(
+                  state.superAdminIds.contains(student.id) ||
+                          email.toLowerCase() ==
+                              AdminAccessService.superAdminEmail
+                      ? 'Super Admin'
+                      : 'Admin',
+                ),
                 visualDensity: VisualDensity.compact,
               ),
             ],
@@ -162,18 +182,50 @@ class StudentsBody extends StatelessWidget {
                 tooltip: 'إدارة الحساب',
                 onSelected: (action) =>
                     _handleAccountAction(context, student.id, action),
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: isAdmin ? 'demote' : 'promote',
-                    child: Text(
-                      isAdmin ? 'إزالة صلاحية الأدمن' : 'تعيين كأدمن',
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('حذف الحساب'),
-                  ),
-                ],
+                itemBuilder: (_) {
+                  final isSuperAdmin =
+                      state.superAdminIds.contains(student.id) ||
+                      email.toLowerCase() == AdminAccessService.superAdminEmail;
+                  final isProtectedAccount =
+                      student.id == FirebaseAuth.instance.currentUser?.uid ||
+                      email.toLowerCase() == AdminAccessService.superAdminEmail;
+                  return [
+                    if (!isAdmin)
+                      const PopupMenuItem(
+                        value: 'set_admin',
+                        child: Text('تعيين Admin'),
+                      ),
+                    if (!isAdmin)
+                      const PopupMenuItem(
+                        value: 'set_super_admin',
+                        child: Text('تعيين Super Admin'),
+                      ),
+                    if (isAdmin && !isSuperAdmin)
+                      const PopupMenuItem(
+                        value: 'set_super_admin',
+                        child: Text('ترقية إلى Super Admin'),
+                      ),
+                    if (isSuperAdmin &&
+                        email.toLowerCase() !=
+                            AdminAccessService.superAdminEmail)
+                      const PopupMenuItem(
+                        value: 'set_admin',
+                        child: Text('تخفيض إلى Admin'),
+                      ),
+                    if (isAdmin &&
+                        email.toLowerCase() !=
+                            AdminAccessService.superAdminEmail)
+                      const PopupMenuItem(
+                        value: 'remove_admin',
+                        child: Text('إزالة صلاحية الإدارة'),
+                      ),
+                    if (!isProtectedAccount)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('حذف الحساب'),
+                      ),
+                  ];
+                },
               ),
             const Icon(Icons.chevron_left),
           ],
@@ -202,23 +254,25 @@ class StudentsBody extends StatelessWidget {
     String studentId,
     String action,
   ) async {
-    if (action == 'promote') {
+    if (action == 'set_admin' || action == 'set_super_admin') {
+      final isSuperAdmin = action == 'set_super_admin';
       final confirmed = await _confirm(
         context,
-        title: 'تعيين أدمن',
-        message:
-            'سيحصل هذا الحساب على صلاحيات إدارة الطلاب والكورسات والامتحانات. هل تريدين المتابعة؟',
-        confirmLabel: 'تعيين كأدمن',
+        title: isSuperAdmin ? 'تعيين Super Admin' : 'تعيين Admin',
+        message: isSuperAdmin
+            ? 'سيحصل هذا الحساب على جميع صلاحيات لوحة التحكم وإدارة الأدمن. هل تريدين المتابعة؟'
+            : 'سيحصل هذا الحساب على صلاحيات إضافة الكورسات والامتحانات والحضور والمواعيد الخاصة به.',
+        confirmLabel: isSuperAdmin ? 'تعيين Super Admin' : 'تعيين Admin',
       );
       if (confirmed && context.mounted) {
         await context.read<StudentsCubit>().setAdminRole(
           studentId,
-          isAdmin: true,
+          role: isSuperAdmin ? 'superAdmin' : 'admin',
         );
       }
       return;
     }
-    if (action == 'demote') {
+    if (action == 'remove_admin') {
       final confirmed = await _confirm(
         context,
         title: 'إزالة صلاحية الأدمن',
@@ -226,10 +280,7 @@ class StudentsBody extends StatelessWidget {
         confirmLabel: 'إزالة الصلاحية',
       );
       if (confirmed && context.mounted) {
-        await context.read<StudentsCubit>().setAdminRole(
-          studentId,
-          isAdmin: false,
-        );
+        await context.read<StudentsCubit>().setAdminRole(studentId, role: null);
       }
       return;
     }

@@ -13,7 +13,12 @@ class ExamsCubit extends Cubit<ExamsState> {
       ..add(
         _service.watchExams().listen(
           (snapshot) {
-            _exams = snapshot.docs;
+            _exams = snapshot.docs.toList()
+              ..sort(
+                (first, second) => _orderOf(
+                  first.data()['order'],
+                ).compareTo(_orderOf(second.data()['order'])),
+              );
             _examsLoaded = true;
             _examsError = null;
             _emitData();
@@ -25,7 +30,12 @@ class ExamsCubit extends Cubit<ExamsState> {
       ..add(
         _service.watchCourses().listen(
           (snapshot) {
-            _courses = snapshot.docs;
+            _courses = snapshot.docs.toList()
+              ..sort(
+                (first, second) => _orderOf(
+                  first.data()['order'],
+                ).compareTo(_orderOf(second.data()['order'])),
+              );
             _coursesLoaded = true;
             _coursesError = null;
             _emitData();
@@ -44,6 +54,8 @@ class ExamsCubit extends Cubit<ExamsState> {
   bool _coursesLoaded = false;
   String? _examsError;
   String? _coursesError;
+
+  int _orderOf(dynamic value) => value is num ? value.toInt() : 0;
 
   void _emitData() {
     if (isClosed) return;

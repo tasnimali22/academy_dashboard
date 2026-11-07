@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/core/utils/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 
@@ -8,12 +9,16 @@ class AppointmentsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('courses')
-          .orderBy('order')
-          .snapshots(),
+      stream: AdminAccessService.watchContent('courses'),
       builder: (context, coursesSnapshot) {
-        final courses = coursesSnapshot.data?.docs ?? [];
+        final courses = coursesSnapshot.data?.docs.toList() ?? [];
+        courses.sort((first, second) {
+          final firstOrder = first.data()['order'];
+          final secondOrder = second.data()['order'];
+          final firstValue = firstOrder is num ? firstOrder : 0;
+          final secondValue = secondOrder is num ? secondOrder : 0;
+          return firstValue.compareTo(secondValue);
+        });
         return Scaffold(
           appBar: AppBar(
             title: const Text('المواعيد'),
@@ -61,7 +66,7 @@ class AppointmentsPage extends StatelessWidget {
     };
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('appointments').snapshots(),
+      stream: AdminAccessService.watchContent('appointments'),
       builder: (context, appointmentsSnapshot) {
         if (appointmentsSnapshot.hasError) {
           return const Center(child: Text('تعذر تحميل المواعيد'));
@@ -251,6 +256,7 @@ class _AppointmentDialogState extends State<_AppointmentDialog> {
         'description': _descriptionController.text.trim(),
         'courseId': course.id,
         'courseTitle': course.data()['title'] as String? ?? course.id,
+        'createdBy': await AdminAccessService.requireUserId(),
         'startsAt': Timestamp.fromDate(startsAt),
         'createdAt': FieldValue.serverTimestamp(),
       });
