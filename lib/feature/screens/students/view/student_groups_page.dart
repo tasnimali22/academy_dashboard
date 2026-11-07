@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/theme/app_text_styles.dart';
 import 'package:codingacademy_admin/core/services/student_groups_service.dart';
 import 'package:codingacademy_admin/core/services/student_accounts_service.dart';
 import 'package:flutter/material.dart';
@@ -429,7 +430,7 @@ class _GroupDialogState extends State<_GroupDialog> {
             if (_error != null)
               Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: AppTextStyles.error(context),
               ),
             Flexible(
               child: ListView(
@@ -587,7 +588,7 @@ class _AppointmentDraftDialogState extends State<_AppointmentDraftDialog> {
             if (_error != null)
               Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: AppTextStyles.error(context),
               ),
           ],
         ),

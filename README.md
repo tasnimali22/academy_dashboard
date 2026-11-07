@@ -23,6 +23,14 @@ Flutter/Firebase admin app for managing courses, exams, student access, and atte
 - `appointments/{appointmentId}` stores `courseId` and `createdBy`. Students
   see appointments only for courses assigned to them; admins see only
   appointments they created.
+- `projects/{projectId}` stores a project assignment, its instructions,
+  optional Drive file link, due date, `createdBy`, `targetUserIds`, and
+  `targetGroupIds`. Admins and Super Admins can grant access to individual
+  students or expand one of their student groups into project access. Assigned
+  students submit a Drive or GitHub solution link under
+  `projects/{projectId}/submissions/{studentUid}`. The owning admin can review
+  submissions and save a grade from 0 to 100 with feedback; other admins
+  cannot access that project's submissions.
 - `admins/{uid}` stores the role as `admin` or `superAdmin`. Existing admin
   documents without a role are treated as `admin`. The initial Super Admin is
   `tasnimali051@gmail.com`; only Super Admins can change roles or student access.
@@ -35,6 +43,8 @@ admins unless its ownership is assigned.
 
 Admin separation and role assignment use Firestore security rules and the
 Firebase client SDK; they do not require Cloud Functions or the Blaze plan.
+Project files and student solutions are shared as external Drive/GitHub links,
+so this feature does not upload files to Firebase Storage.
 Deploy only the Firestore rules from the student project directory:
 
 ```shell

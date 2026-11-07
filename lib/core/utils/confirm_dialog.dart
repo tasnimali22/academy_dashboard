@@ -1,3 +1,4 @@
+import 'package:codingacademy_admin/core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 
 Future<bool> confirmDelete(BuildContext context, String text) async {
@@ -13,7 +14,7 @@ Future<bool> confirmDelete(BuildContext context, String text) async {
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          child: const Text('حذف', style: AppTextStyles.destructiveAction),
         ),
       ],
     ),

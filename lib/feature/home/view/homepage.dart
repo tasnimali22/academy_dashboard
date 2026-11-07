@@ -1,12 +1,15 @@
 import 'package:codingacademy_admin/core/services/admin_access_service.dart';
 import 'package:codingacademy_admin/feature/screens/courses/view/courses_page.dart';
 import 'package:codingacademy_admin/feature/screens/attendance/view/attendance_page.dart';
+import 'package:codingacademy_admin/feature/screens/attendance/view/attendance_report_page.dart';
 import 'package:codingacademy_admin/feature/screens/appointments/view/appointments_page.dart';
 import 'package:codingacademy_admin/feature/screens/exams/view/exams_page.dart';
 import 'package:codingacademy_admin/feature/screens/students/view/students_page.dart';
 import 'package:codingacademy_admin/feature/screens/students/view/student_groups_page.dart';
+import 'package:codingacademy_admin/feature/screens/projects/view/projects_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -54,10 +57,22 @@ class HomePage extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const AttendancePage()),
             );
           }),
+          _Item('إحصائيات الحضور', Icons.analytics_outlined, () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AttendanceReportPage()),
+            );
+          }),
           _Item('المواعيد', Icons.calendar_month, () {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AppointmentsPage()),
+            );
+          }),
+          _Item('الأعمال والمشاريع', Icons.work_outline, () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProjectsPage()),
             );
           }),
         ];
@@ -95,7 +110,7 @@ class HomePage extends StatelessWidget {
             ],
           ),
           body: GridView.count(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16.r),
             crossAxisCount: 2,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
@@ -111,8 +126,8 @@ class HomePage extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(item.icon, size: 40),
-                        const SizedBox(height: 8),
+                        Icon(item.icon, size: 40.sp),
+                        SizedBox(height: 8.h),
                         Text(item.title),
                       ],
                     ),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/theme/app_text_styles.dart';
 import 'package:codingacademy_admin/feature/screens/students/data/cubit/student_permissions_cubit.dart';
 import 'package:codingacademy_admin/feature/screens/students/data/cubit/student_permissions_state.dart';
 import 'package:codingacademy_admin/feature/screens/students/view/students_page.dart';
@@ -54,9 +55,7 @@ class StudentPermissionsDialog extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
                           state.errorMessage!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                          style: AppTextStyles.error(context),
                         ),
                       ),
                     const TabBar(

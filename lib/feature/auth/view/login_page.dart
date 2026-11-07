@@ -1,7 +1,9 @@
 import 'package:codingacademy_admin/feature/auth/data/cubit/auth_login_cubit.dart';
 import 'package:codingacademy_admin/feature/auth/data/cubit/auth_login_state.dart';
+import 'package:codingacademy_admin/core/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -13,8 +15,9 @@ class LoginPage extends StatelessWidget {
       child: BlocConsumer<LoginCubit, LoginState>(
         listener: (context, state) {
           if (state.error != null) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(state.error!)));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.error!)));
           }
         },
         builder: (context, state) {
@@ -23,16 +26,15 @@ class LoginPage extends StatelessWidget {
           return Scaffold(
             body: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(24.r),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       'لوحة التحكم',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: AppTextStyles.pageTitle,
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24.h),
                     TextField(
                       controller: cubit.emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -41,7 +43,7 @@ class LoginPage extends StatelessWidget {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16.h),
                     TextField(
                       controller: cubit.passwordController,
                       obscureText: true,
@@ -50,7 +52,7 @@ class LoginPage extends StatelessWidget {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24.h),
                     state.loading
                         ? const CircularProgressIndicator()
                         : SizedBox(

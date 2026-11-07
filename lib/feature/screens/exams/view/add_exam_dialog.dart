@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:codingacademy_admin/core/theme/app_text_styles.dart';
 import 'package:codingacademy_admin/feature/screens/exams/data/cubit/add_exam_cubit.dart';
 import 'package:codingacademy_admin/feature/screens/exams/data/cubit/add_exam_state.dart';
 import 'package:codingacademy_admin/feature/screens/exams/data/service/exams_service.dart';
@@ -104,9 +105,7 @@ class AddExamDialog extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         state.errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                        style: AppTextStyles.error(context),
                       ),
                     ),
                 ],

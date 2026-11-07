@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:codingacademy_admin/core/services/admin_access_service.dart';
+import 'package:codingacademy_admin/core/theme/app_text_styles.dart';
 import 'package:codingacademy_admin/core/utils/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 
@@ -341,7 +342,7 @@ class _AppointmentDialogState extends State<_AppointmentDialog> {
               const SizedBox(height: 12),
               Text(
                 _errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: AppTextStyles.error(context),
               ),
             ],
           ],

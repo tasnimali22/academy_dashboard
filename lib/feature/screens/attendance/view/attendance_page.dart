@@ -132,15 +132,49 @@ class _AttendancePageState extends State<AttendancePage> {
     setState(() => _saving = true);
     try {
       final id = _documentId(courseId, _date);
-      await FirebaseFirestore.instance.collection('attendance').doc(id).set({
+      final createdBy =
+          _recordOwner ?? await AdminAccessService.requireUserId();
+      final record = {
         'courseId': courseId,
-        'createdBy': _recordOwner ?? await AdminAccessService.requireUserId(),
+        'createdBy': createdBy,
         'date': Timestamp.fromDate(_date),
         'records': {
           for (final student in students) student.id: _marks[student.id],
         },
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+      final firestore = FirebaseFirestore.instance;
+      final writes = [
+        for (final student in students)
+          (
+            reference: firestore
+                .collection('users')
+                .doc(student.id)
+                .collection('attendance')
+                .doc(id),
+            data: {
+              'courseId': courseId,
+              'createdBy': createdBy,
+              'date': Timestamp.fromDate(_date),
+              'present': _marks[student.id]!,
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+          ),
+      ];
+      for (var start = 0; start < writes.length; start += 450) {
+        final batch = firestore.batch();
+        final chunk = writes.skip(start).take(450);
+        for (final write in chunk) {
+          batch.set(write.reference, write.data);
+        }
+        if (start == 0) {
+          batch.set(firestore.collection('attendance').doc(id), record);
+        }
+        await batch.commit();
+      }
+      if (writes.isEmpty) {
+        await firestore.collection('attendance').doc(id).set(record);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -264,8 +298,11 @@ class _AttendancePageState extends State<AttendancePage> {
                       if (ids.contains(selectedCourse)) return true;
                       final ownerId =
                           courses
-                              .firstWhere((course) => course.id == selectedCourse)
-                              .data()['createdBy'] as String? ??
+                                  .firstWhere(
+                                    (course) => course.id == selectedCourse,
+                                  )
+                                  .data()['createdBy']
+                              as String? ??
                           '';
                       final grants = data['adminCourseGrants'];
                       final ownerGrants = grants is Map
